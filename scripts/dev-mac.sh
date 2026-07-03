@@ -38,7 +38,7 @@ else
   log "No customer.xlsx in project root — upload via Web UI after start"
 fi
 
-PORT="$(grep -E '^VCENTEREMU_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 8443)"
+PORT="$(grep -E '^VCENTEREMU_PORT=' .env 2>/dev/null | cut -d= -f2- || echo 8181)"
 HOST="$(grep -E '^VCENTEREMU_HOST=' .env 2>/dev/null | cut -d= -f2- || echo 127.0.0.1)"
 
 echo ""

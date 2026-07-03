@@ -10,7 +10,7 @@ Group=vcenteremu
 WorkingDirectory=/opt/vcenteremu
 RuntimeDirectory=vcenteremu
 Environment=VCENTEREMU_HOST=0.0.0.0
-Environment=VCENTEREMU_PORT=8443
+Environment=VCENTEREMU_PORT=8181
 Environment=VCENTEREMU_UPLOAD_DIR=/var/lib/vcenteremu/uploads
 EnvironmentFile=-/etc/vcenteremu/vcenteremu.env
 ExecStart=/opt/vcenteremu/deploy/vcenteremu-start.sh foreground

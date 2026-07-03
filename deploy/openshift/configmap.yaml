@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: vcenteremu
 data:
   VCENTEREMU_HOST: "0.0.0.0"
-  VCENTEREMU_PORT: "8080"
+  VCENTEREMU_PORT: "8181"
   VCENTEREMU_UPLOAD_DIR: "/var/lib/vcenteremu/uploads"
   VCENTEREMU_WORKERS: "1"
   VCENTEREMU_API_USERNAME: "administrator@vsphere.local"

@@ -34,7 +34,7 @@ set_env() {
 }
 
 set_env "VCENTEREMU_HOST" "127.0.0.1"
-set_env "VCENTEREMU_PORT" "8080"
+set_env "VCENTEREMU_PORT" "8182"
 set_env "VCENTEREMU_VCENTER_NAME" "${SERVER_NAME}"
 chmod 640 "${ENV_FILE}"
 
@@ -43,14 +43,15 @@ systemctl restart nginx
 systemctl restart vcenteremu 2>/dev/null || true
 
 if systemctl is-active --quiet firewalld; then
-  firewall-cmd --permanent --add-service=https
-  firewall-cmd --permanent --add-service=http
+  firewall-cmd --permanent --add-port=9443/tcp
+  firewall-cmd --permanent --add-port=8181/tcp
   firewall-cmd --reload
 fi
 
 echo ""
 echo "TLS/nginx eingerichtet."
-echo "  HTTPS: https://${SERVER_NAME}/"
-echo "  API:   https://${SERVER_NAME}/rest/"
+echo "  HTTPS: https://${SERVER_NAME}:9443/"
+echo "  API:   https://${SERVER_NAME}:9443/rest/"
+echo "  HTTP:  http://${SERVER_NAME}:8181/ (redirects to HTTPS)"
 echo ""
 echo "Hinweis: Selbstsigniertes Zertifikat — Clients mit curl -k oder CA importieren."

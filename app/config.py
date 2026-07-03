@@ -7,7 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="VCENTEREMU_", env_file=".env")
 
     host: str = "0.0.0.0"
-    port: int = 8443
+    port: int = 8181
     workers: int = 1
     api_username: str = "administrator@vsphere.local"
     api_password: str = "Emulator123!"

@@ -13,7 +13,7 @@ if [[ -f .env ]]; then
 fi
 
 HOST="${VCENTEREMU_HOST:-127.0.0.1}"
-PORT="${VCENTEREMU_PORT:-8443}"
+PORT="${VCENTEREMU_PORT:-8181}"
 BASE="http://${HOST}:${PORT}"
 USER="${VCENTEREMU_API_USERNAME:-administrator@vsphere.local}"
 PASS="${VCENTEREMU_API_PASSWORD:-Emulator123!}"

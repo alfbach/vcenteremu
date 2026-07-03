@@ -9,6 +9,6 @@ spec:
     app.kubernetes.io/name: vcenteremu
   ports:
     - name: http
-      port: 8080
+      port: 8181
       targetPort: http
       protocol: TCP

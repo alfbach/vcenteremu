@@ -8,7 +8,7 @@
 #
 # Options:
 #   --with-tls       Also configure nginx + self-signed TLS
-#   --with-firewall  Open firewalld ports (8443 or 443 with --with-tls)
+#   --with-firewall  Open firewalld ports (8181 or 9443 with --with-tls)
 #   --hostname NAME  Hostname/FQDN for TLS and vCenter name (default: hostname -f)
 #   --app-dir PATH   Install path (default: /opt/vcenteremu)
 #
@@ -124,7 +124,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   log "Erstelle ${ENV_FILE} ..."
   cat > "${ENV_FILE}" <<EOF
 VCENTEREMU_HOST=0.0.0.0
-VCENTEREMU_PORT=8443
+VCENTEREMU_PORT=8181
 VCENTEREMU_WORKERS=4
 VCENTEREMU_UPLOAD_DIR=${DATA_DIR}
 VCENTEREMU_API_USERNAME=administrator@vsphere.local
@@ -162,10 +162,10 @@ chmod 755 "${RUN_DIR}"
 # SELinux: allow nginx to connect to backend if TLS is used later
 if command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce)" != "Disabled" ]]; then
   if command -v semanage >/dev/null 2>&1; then
-    semanage port -a -t http_port_t -p tcp 8443 2>/dev/null || \
-    semanage port -m -t http_port_t -p tcp 8443 2>/dev/null || true
-    semanage port -a -t http_port_t -p tcp 8080 2>/dev/null || \
-    semanage port -m -t http_port_t -p tcp 8080 2>/dev/null || true
+    semanage port -a -t http_port_t -p tcp 8181 2>/dev/null || \
+    semanage port -m -t http_port_t -p tcp 8181 2>/dev/null || true
+    semanage port -a -t http_port_t -p tcp 9443 2>/dev/null || \
+    semanage port -m -t http_port_t -p tcp 9443 2>/dev/null || true
   fi
 fi
 
@@ -180,10 +180,10 @@ if [[ "${WITH_FIREWALL}" == true ]]; then
   if systemctl is-active --quiet firewalld; then
     log "Öffne firewalld-Ports ..."
     if [[ "${WITH_TLS}" == true ]]; then
-      firewall-cmd --permanent --add-service=https
-      firewall-cmd --permanent --add-service=http
+      firewall-cmd --permanent --add-port=9443/tcp
+      firewall-cmd --permanent --add-port=8181/tcp
     else
-      firewall-cmd --permanent --add-port=8443/tcp
+      firewall-cmd --permanent --add-port=8181/tcp
     fi
     firewall-cmd --reload
   else
@@ -203,9 +203,9 @@ else
 fi
 
 # --- Health check ---
-HEALTH_URL="http://127.0.0.1:8443/health"
+HEALTH_URL="http://127.0.0.1:8181/health"
 if [[ "${WITH_TLS}" == true ]]; then
-  HEALTH_URL="https://127.0.0.1/health"
+  HEALTH_URL="https://127.0.0.1:9443/health"
 fi
 
 if curl -sk --max-time 5 "${HEALTH_URL}" >/dev/null 2>&1; then
@@ -219,11 +219,11 @@ echo "============================================"
 echo " vCenter Emulator — Installation abgeschlossen"
 echo "============================================"
 if [[ "${WITH_TLS}" == true ]]; then
-  echo " Web-UI:  https://${HOSTNAME}/"
-  echo " API:     https://${HOSTNAME}/rest/"
+  echo " Web-UI:  https://${HOSTNAME}:9443/"
+  echo " API:     https://${HOSTNAME}:9443/rest/"
 else
-  echo " Web-UI:  http://${HOSTNAME}:8443/"
-  echo " API:     http://${HOSTNAME}:8443/rest/"
+  echo " Web-UI:  http://${HOSTNAME}:8181/"
+  echo " API:     http://${HOSTNAME}:8181/rest/"
 fi
 echo ""
 echo " Steuerung:"

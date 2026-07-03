@@ -34,7 +34,7 @@ TRANSLATIONS: dict[str, dict[str, Any]] = {
         "tls_note": (
             "For HTTPS on RHEL 10: "
             "<code>sudo bash deploy/install-nginx-tls.sh vcenteremu.local</code> "
-            "— nginx on port 443, backend internally on 127.0.0.1:8080, self-signed certificate."
+            "— nginx on ports 9443 (HTTPS) and 8181 (redirect), backend on 127.0.0.1:8182, self-signed certificate."
         ),
         "example_heading": "Example: session, VM list, and power on",
         "endpoints_heading": "Available endpoints",
@@ -92,7 +92,7 @@ TRANSLATIONS: dict[str, dict[str, Any]] = {
         "tls_note": (
             "Für HTTPS auf RHEL 10: "
             "<code>sudo bash deploy/install-nginx-tls.sh vcenteremu.local</code> "
-            "— nginx auf Port 443, Backend intern auf 127.0.0.1:8080, selbstsigniertes Zertifikat."
+            "— nginx auf Port 9443 (HTTPS) und 8181 (Redirect), Backend auf 127.0.0.1:8182, selbstsigniertes Zertifikat."
         ),
         "example_heading": "Beispiel: Session, VM-Liste und Power On",
         "endpoints_heading": "Verfügbare Endpunkte",
