@@ -2,6 +2,8 @@
 
 Emulates a **VMware vCenter REST API** based on an **RVtools XLSX export**. The application runs on **RHEL 10**, provides a web interface for uploads, and serves multiple concurrent API clients.
 
+![vCenter Emulator Web UI](screen1.png)
+
 ## Features
 
 - Web UI for uploading RVtools files (`ExportAll2xlsx` or individual tabs)
@@ -49,63 +51,150 @@ uvicorn app.main:app --host 0.0.0.0 --port 8443 --reload
 
 Web UI: `http://localhost:8443/`
 
-## Installation on RHEL 10
+## Download, install, and run on RHEL 10
 
-Full installation including all system prerequisites:
+This section describes how to deploy the emulator on a fresh **Red Hat Enterprise Linux 10** server.
+
+### Requirements
+
+- RHEL 10 (or compatible Enterprise Linux) with `sudo` access
+- Network access to install packages via `dnf`
+- An RVtools XLSX export (e.g. `ExportAll2xlsx`) from your vSphere environment
+- Optional: registered DNS name and open firewall ports for remote access
+
+### 1. Download
+
+Clone the repository or copy the release archive to the server:
+
+```bash
+sudo dnf install -y git
+git clone https://github.com/alfbach/vcenteremu.git
+cd vcenteremu
+```
+
+Alternatively, upload a ZIP/tarball of the project and extract it:
+
+```bash
+cd vcenteremu
+```
+
+### 2. Install
+
+Run the install script as **root**. It installs all OS prerequisites, creates a Python virtual environment, deploys the application to `/opt/vcenteremu`, and registers a **systemd** service.
+
+**Standard installation (HTTP on port 8443):**
 
 ```bash
 sudo bash deploy/install.sh
 ```
 
-With TLS (nginx) and firewall:
+**Production installation with HTTPS and firewall rules:**
 
 ```bash
-sudo bash deploy/install.sh --with-tls --with-firewall --hostname vcenteremu.local
+sudo bash deploy/install.sh \
+  --with-tls \
+  --with-firewall \
+  --hostname vcenteremu.example.com
 ```
 
-The script installs, among other things:
-- `python3`, `python3-pip`, `python3-devel`
-- Build tools: `gcc`, `gcc-c++`, `make`
-- `openssl`, `curl`, `rsync`, `systemd`
-- Python venv + application dependencies
-- systemd service `vcenteremu`
-- Control script `vcenteremu-ctl`
+The installer automatically sets up:
 
-Alternative (compatibility wrapper): `sudo bash deploy/install-rhel10.sh`
+| Component | Location / name |
+|---|---|
+| Application | `/opt/vcenteremu` |
+| Upload storage | `/var/lib/vcenteremu/uploads` |
+| Configuration | `/etc/vcenteremu/vcenteremu.env` |
+| Logs | `/var/log/vcenteremu/` |
+| systemd service | `vcenteremu.service` |
+| Control script | `vcenteremu-ctl` |
 
-Optional configuration in `/etc/vcenteremu/vcenteremu.env`:
+Installed packages include `python3`, `python3-pip`, `python3-devel`, `gcc`, `gcc-c++`, `make`, `openssl`, `curl`, `rsync`, and `systemd`.
+
+### 3. Configure (optional)
+
+Edit `/etc/vcenteremu/vcenteremu.env` before or after installation:
 
 ```env
 VCENTEREMU_API_USERNAME=administrator@vsphere.local
 VCENTEREMU_API_PASSWORD=Emulator123!
-VCENTEREMU_VCENTER_NAME=vcenteremu.local
+VCENTEREMU_VCENTER_NAME=vcenteremu.example.com
 VCENTEREMU_HOST=0.0.0.0
 VCENTEREMU_PORT=8443
 VCENTEREMU_WORKERS=4
-VCENTEREMU_MAX_UPLOAD_MB=256
+VCENTEREMU_MAX_UPLOAD_MB=512
 ```
 
-### TLS with nginx (recommended for production)
+Change the default password before exposing the service to a network.
+
+Apply changes:
 
 ```bash
-sudo bash deploy/install-nginx-tls.sh vcenteremu.local
+sudo systemctl restart vcenteremu
 ```
 
-- nginx listens on **443** (HTTPS)
-- Backend internally on **127.0.0.1:8080**
-- Self-signed certificate under `/etc/vcenteremu/tls/`
-- Custom certificate: place `cert.pem` and `key.pem` there and restart nginx
+### 4. Run and verify
+
+Check that the service is running:
+
+```bash
+sudo systemctl status vcenteremu
+sudo systemctl enable vcenteremu
+```
+
+Open the web UI in a browser:
+
+| Mode | URL |
+|---|---|
+| HTTP (default) | `http://<server-fqdn>:8443/` |
+| HTTPS (with `--with-tls`) | `https://<server-fqdn>/` |
+
+**First steps in the UI:**
+
+1. Open the web interface (see screenshot above).
+2. Choose **EN** or **DE** for the interface language.
+3. Upload your RVtools `.xlsx` file under **Upload RVtools export**.
+4. Review inventory statistics and API credentials on the dashboard.
+
+Quick health check from the server:
+
+```bash
+curl -s http://127.0.0.1:8443/health
+```
+
+API smoke test:
+
+```bash
+TOKEN=$(curl -sk -u 'administrator@vsphere.local:Emulator123!' \
+  -X POST 'http://127.0.0.1:8443/rest/com/vmware/cis/session')
+curl -sk -H "vmware-api-session-id: ${TOKEN}" \
+  'http://127.0.0.1:8443/rest/vcenter/vm' | head
+```
 
 Service management:
 
 ```bash
-sudo systemctl status vcenteremu
 sudo systemctl restart vcenteremu
+sudo journalctl -u vcenteremu -f
 
 # or manually without systemd:
 sudo vcenteremu-ctl start|stop|restart|status
 sudo vcenteremu-ctl foreground   # foreground / debugging
 ```
+
+Alternative install wrapper: `sudo bash deploy/install-rhel10.sh`
+
+### TLS with nginx (optional, recommended for production)
+
+If you did not use `--with-tls` during installation:
+
+```bash
+sudo bash deploy/install-nginx-tls.sh vcenteremu.example.com
+```
+
+- nginx listens on **443** (HTTPS)
+- Backend runs internally on **127.0.0.1:8080**
+- Self-signed certificate: `/etc/vcenteremu/tls/`
+- Replace with your own CA: place `cert.pem` and `key.pem` in that directory and run `sudo systemctl restart nginx`
 
 ## API Usage
 
