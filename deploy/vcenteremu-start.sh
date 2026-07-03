@@ -188,11 +188,27 @@ diagnose() {
     curl -sk --max-time 3 "https://127.0.0.1:9443/health" 2>/dev/null && log "  → OK" || log "  → FEHLER"
   fi
   log "Health (App): curl -s http://${health_host}:${health_port}/health"
-  curl -s --max-time 3 "http://${health_host}:${health_port}/health" 2>/dev/null && log "  → OK" || log "  → FEHLER"
+  local health_body health_ok=false
+  health_body="$(curl -s --max-time 3 "http://${health_host}:${health_port}/health" 2>/dev/null || true)"
+  if [[ -n "${health_body}" ]]; then
+    echo "${health_body}"
+    log "  → OK"
+    health_ok=true
+  else
+    log "  → FEHLER"
+  fi
+
+  if [[ "${health_ok}" == true ]] && grep -q '"inventory_loaded":false' <<< "${health_body}"; then
+    log "Hinweis: Kein Inventar geladen — XLSX über Web-UI hochladen oder VCENTEREMU_AUTO_LOAD_XLSX setzen."
+  fi
 
   if systemctl is-active --quiet firewalld 2>/dev/null; then
     log "firewalld aktiv — Ports:"
     firewall-cmd --list-ports 2>/dev/null || true
+    if ! firewall-cmd --list-ports 2>/dev/null | grep -qE '(^| )8181/tcp'; then
+      log "HINWEIS: Port 8181/tcp nicht in firewalld — von außen evtl. nicht erreichbar."
+      log "Fix: firewall-cmd --permanent --add-port=8181/tcp && firewall-cmd --reload"
+    fi
   fi
 
   if [[ "${VCENTEREMU_HOST}" == "127.0.0.1" ]] && [[ ! -f /etc/nginx/conf.d/vcenteremu.conf ]]; then
@@ -200,10 +216,18 @@ diagnose() {
     log "Fix: VCENTEREMU_HOST=0.0.0.0 und VCENTEREMU_PORT=8181 in ${ENV_FILE}, dann systemctl restart vcenteremu"
   fi
 
-  if ss -tlnp 2>/dev/null | grep -q ':8181'; then
-    log "Port 8181 belegt von:"
-    ss -tlnp 2>/dev/null | grep ':8181' || true
-    log "Fix: systemctl stop vcenteremu; sudo fuser -k 8181/tcp; systemctl start vcenteremu"
+  local port8181
+  port8181="$(ss -tlnp 2>/dev/null | grep ':8181' || true)"
+  if [[ -n "${port8181}" ]] && [[ "${health_ok}" != true ]]; then
+    log "Port 8181 belegt, Health-Check fehlgeschlagen:"
+    echo "${port8181}"
+    if ! grep -q 'vcenteremu' <<< "${port8181}"; then
+      log "Fix: fremden Prozess beenden oder nginx-Config entfernen, dann systemctl restart vcenteremu"
+    else
+      log "Fix: journalctl -u vcenteremu -n 30 --no-pager"
+    fi
+  elif [[ -n "${port8181}" ]] && grep -q 'vcenteremu' <<< "${port8181}" && [[ "${health_ok}" == true ]]; then
+    log "Service OK — lauscht auf 0.0.0.0:8181 (PID $(grep -o 'pid=[0-9]*' <<< "${port8181}" | head -1 | cut -d= -f2))"
   fi
 
   if [[ -f "${ENV_FILE}" ]] && ! sudo -u "${SERVICE_USER}" test -r "${ENV_FILE}" 2>/dev/null; then
