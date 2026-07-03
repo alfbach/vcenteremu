@@ -26,7 +26,7 @@ ENV_DIR="/etc/vcenteremu"
 ENV_FILE="${ENV_DIR}/vcenteremu.env"
 SERVICE_USER="vcenteremu"
 SERVICE_NAME="vcenteremu"
-CTL_BIN="/usr/local/bin/vcenteremu-ctl"
+CTL_BIN="/usr/bin/vcenteremu-ctl"
 NGINX_CONF="/etc/nginx/conf.d/vcenteremu.conf"
 
 set_env() {
@@ -167,6 +167,8 @@ log "Erstelle Python venv und installiere Abhängigkeiten ..."
 # --- Startup script + control wrapper ---
 log "Installiere Startup-Skript ..."
 install -m 755 "${APP_DIR}/deploy/vcenteremu-start.sh" "${CTL_BIN}"
+install -m 755 "${APP_DIR}/deploy/diagnose.sh" "/usr/bin/vcenteremu-diagnose"
+rm -f /usr/local/bin/vcenteremu-ctl
 
 # --- Data directories (before systemd) ---
 log "Setze Berechtigungen ..."
@@ -218,20 +220,18 @@ else
   fi
 fi
 
-# --- Firewall (optional) ---
-if [[ "${WITH_FIREWALL}" == true ]]; then
-  if systemctl is-active --quiet firewalld; then
-    log "Öffne firewalld-Ports ..."
-    if [[ "${WITH_TLS}" == true ]]; then
-      firewall-cmd --permanent --add-port=9443/tcp
-      firewall-cmd --permanent --add-port=8181/tcp
-    else
-      firewall-cmd --permanent --add-port=8181/tcp
-    fi
-    firewall-cmd --reload
+# --- Firewall ---
+if systemctl is-active --quiet firewalld 2>/dev/null; then
+  log "firewalld aktiv — öffne Ports ..."
+  if [[ "${WITH_TLS}" == true ]]; then
+    firewall-cmd --permanent --add-port=9443/tcp
+    firewall-cmd --permanent --add-port=8181/tcp
   else
-    log "firewalld nicht aktiv — überspringe Firewall-Konfiguration."
+    firewall-cmd --permanent --add-port=8181/tcp
   fi
+  firewall-cmd --reload
+elif [[ "${WITH_FIREWALL}" == true ]]; then
+  log "firewalld nicht aktiv — überspringe Firewall-Konfiguration."
 fi
 
 # --- Start service ---
@@ -246,7 +246,9 @@ else
 fi
 
 # --- Health check ---
-HEALTH_URL="http://127.0.0.1:8181/health"
+APP_PORT="$(grep -E '^VCENTEREMU_PORT=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || echo 8181)"
+APP_HOST="$(grep -E '^VCENTEREMU_HOST=' "${ENV_FILE}" 2>/dev/null | cut -d= -f2- || echo 0.0.0.0)"
+HEALTH_URL="http://127.0.0.1:${APP_PORT}/health"
 if [[ "${WITH_TLS}" == true ]]; then
   HEALTH_URL="https://127.0.0.1:9443/health"
 fi
@@ -254,7 +256,9 @@ fi
 if curl -sk --max-time 5 "${HEALTH_URL}" >/dev/null 2>&1; then
   log "Health-Check OK: ${HEALTH_URL}"
 else
-  log "Health-Check fehlgeschlagen — Diagnose: vcenteremu-ctl diagnose"
+  log "Health-Check FEHLGESCHLAGEN: ${HEALTH_URL}"
+  log "Diagnose: sudo vcenteremu-diagnose  oder  sudo bash ${APP_DIR}/deploy/diagnose.sh"
+  bash "${APP_DIR}/deploy/vcenteremu-start.sh" diagnose || true
 fi
 
 if command -v ss >/dev/null 2>&1; then
@@ -276,11 +280,12 @@ else
 fi
 echo ""
 echo " Diagnose bei Problemen:"
-echo "   vcenteremu-ctl diagnose"
+echo "   sudo vcenteremu-diagnose"
+echo "   sudo bash ${APP_DIR}/deploy/diagnose.sh"
 echo ""
 echo " Steuerung:"
 echo "   systemctl status ${SERVICE_NAME}"
-echo "   vcenteremu-ctl status|start|stop|restart|foreground"
+echo "   sudo vcenteremu-ctl status|start|stop|restart"
 echo ""
 echo " Konfiguration: ${ENV_FILE}"
 echo " Logs:          journalctl -u ${SERVICE_NAME} -f"
