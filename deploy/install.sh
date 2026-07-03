@@ -19,8 +19,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 APP_DIR="/opt/vcenteremu"
 DATA_DIR="/var/lib/vcenteremu/uploads"
+STATE_DIR="/var/lib/vcenteremu/run"
 LOG_DIR="/var/log/vcenteremu"
-RUN_DIR="/run/vcenteremu"
 ENV_DIR="/etc/vcenteremu"
 ENV_FILE="${ENV_DIR}/vcenteremu.env"
 SERVICE_USER="vcenteremu"
@@ -102,7 +102,7 @@ fi
 
 # --- Directories ---
 log "Erstelle Verzeichnisse ..."
-mkdir -p "${APP_DIR}" "${DATA_DIR}" "${LOG_DIR}" "${RUN_DIR}" "${ENV_DIR}"
+mkdir -p "${APP_DIR}" "${DATA_DIR}" "${STATE_DIR}" "${LOG_DIR}" "${ENV_DIR}"
 
 # --- Application files ---
 log "Kopiere Anwendung nach ${APP_DIR} ..."
@@ -148,16 +148,27 @@ log "Erstelle Python venv und installiere Abhängigkeiten ..."
 log "Installiere Startup-Skript ..."
 install -m 755 "${APP_DIR}/deploy/vcenteremu-start.sh" "${CTL_BIN}"
 
+# --- Data directories (before systemd) ---
+log "Setze Berechtigungen ..."
+mkdir -p "${DATA_DIR}" "${STATE_DIR}" "${LOG_DIR}"
+chown -R "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}" "${DATA_DIR}" "${STATE_DIR}" "${LOG_DIR}"
+chmod 750 "${DATA_DIR}" "${STATE_DIR}" "${LOG_DIR}"
+
+# --- tmpfiles.d (always written inline — no extra file required on server) ---
+log "Installiere tmpfiles.d ..."
+cat > /etc/tmpfiles.d/vcenteremu.conf <<EOF
+d /var/lib/vcenteremu/run 0750 ${SERVICE_USER} ${SERVICE_USER} -
+d /var/lib/vcenteremu/uploads 0750 ${SERVICE_USER} ${SERVICE_USER} -
+d /var/log/vcenteremu 0750 ${SERVICE_USER} ${SERVICE_USER} -
+EOF
+chmod 644 /etc/tmpfiles.d/vcenteremu.conf
+systemd-tmpfiles --create /etc/tmpfiles.d/vcenteremu.conf 2>/dev/null || true
+
 # --- systemd unit ---
 log "Installiere systemd Service ..."
 install -m 644 "${APP_DIR}/deploy/vcenteremu.service" "/etc/systemd/system/${SERVICE_NAME}.service"
 systemctl daemon-reload
 systemctl enable "${SERVICE_NAME}.service"
-
-# --- Permissions ---
-chown -R "${SERVICE_USER}:${SERVICE_USER}" "${APP_DIR}" "${DATA_DIR}" "${LOG_DIR}"
-chmod 750 "${DATA_DIR}" "${LOG_DIR}"
-chmod 755 "${RUN_DIR}"
 
 # SELinux: allow nginx to connect to backend if TLS is used later
 if command -v getenforce >/dev/null 2>&1 && [[ "$(getenforce)" != "Disabled" ]]; then

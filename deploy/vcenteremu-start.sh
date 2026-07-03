@@ -11,7 +11,7 @@ set -euo pipefail
 
 APP_DIR="${VCENTEREMU_APP_DIR:-/opt/vcenteremu}"
 ENV_FILE="${VCENTEREMU_ENV_FILE:-/etc/vcenteremu/vcenteremu.env}"
-PID_FILE="${VCENTEREMU_PID_FILE:-/run/vcenteremu/vcenteremu.pid}"
+PID_FILE="${VCENTEREMU_PID_FILE:-/var/lib/vcenteremu/run/vcenteremu.pid}"
 LOG_DIR="${VCENTEREMU_LOG_DIR:-/var/log/vcenteremu}"
 RUN_DIR="$(dirname "${PID_FILE}")"
 SERVICE_USER="${VCENTEREMU_USER:-vcenteremu}"
@@ -36,8 +36,13 @@ load_env() {
 }
 
 preflight() {
-  [[ -x "${VCENTEREMU_BIN}" ]] || fail "Anwendung nicht installiert: ${VCENTEREMU_BIN}"
-  mkdir -p "${LOG_DIR}" "${RUN_DIR}" "${VCENTEREMU_UPLOAD_DIR}"
+  [[ -x "${VCENTEREMU_BIN}" ]] || fail "Application not installed: ${VCENTEREMU_BIN}"
+  if [[ "${EUID}" -eq 0 ]]; then
+    mkdir -p "${LOG_DIR}" "${RUN_DIR}" "${VCENTEREMU_UPLOAD_DIR}"
+    chown -R "${SERVICE_USER}:${SERVICE_USER}" "${LOG_DIR}" "${RUN_DIR}" "${VCENTEREMU_UPLOAD_DIR}" 2>/dev/null || true
+  else
+    mkdir -p "${LOG_DIR}" "${RUN_DIR}" "${VCENTEREMU_UPLOAD_DIR}" 2>/dev/null || true
+  fi
 }
 
 is_running() {
@@ -51,7 +56,6 @@ start_foreground() {
   load_env
   preflight
   cd "${APP_DIR}"
-  log "Starte im Vordergrund auf ${VCENTEREMU_HOST}:${VCENTEREMU_PORT} (Worker: ${VCENTEREMU_WORKERS}) ..."
   exec "${VCENTEREMU_BIN}"
 }
 
