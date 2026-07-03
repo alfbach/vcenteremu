@@ -126,8 +126,9 @@ sudo bash deploy/install.sh \
 | Logs | `/var/log/vcenteremu/` |
 | systemd service | `vcenteremu.service` |
 | Control script | `vcenteremu-ctl` |
+| Uninstall script | `deploy/uninstall.sh` |
 
-Alternative wrapper: `sudo bash deploy/install-rhel10.sh`
+Alternative wrappers: `sudo bash deploy/install-rhel10.sh` · `sudo bash deploy/uninstall-rhel10.sh`
 
 ### 3. Configure (optional)
 
@@ -201,7 +202,55 @@ curl -sk -H "vmware-api-session-id: ${TOKEN}" \
 sudo systemctl restart vcenteremu
 sudo journalctl -u vcenteremu -f
 sudo vcenteremu-ctl start|stop|restart|status
+sudo vcenteremu-diagnose
 ```
+
+### 5. Uninstall
+
+Run as **root** from your git clone (same as installation).
+
+**Standard uninstall** — stops the service and removes the application, systemd unit, control scripts, nginx integration, and firewall rules. Configuration, upload data, and logs under `/etc/vcenteremu` and `/var/lib/vcenteremu` are **kept**:
+
+```bash
+sudo bash deploy/uninstall.sh
+```
+
+**Full purge** — additionally removes configuration, data, logs, TLS certificates, and the `vcenteremu` system user:
+
+```bash
+sudo bash deploy/uninstall.sh --purge --yes
+```
+
+**Purge but keep uploaded XLSX files:**
+
+```bash
+sudo bash deploy/uninstall.sh --purge --keep-data --yes
+```
+
+| Option | Description |
+|---|---|
+| `--purge` | Remove `/etc/vcenteremu`, `/var/lib/vcenteremu`, `/var/log/vcenteremu`, and user `vcenteremu` |
+| `--keep-data` | With `--purge`: keep `/var/lib/vcenteremu/uploads` |
+| `--app-dir PATH` | Custom application path (default: `/opt/vcenteremu`) |
+| `--yes`, `-y` | Skip confirmation prompt |
+
+**What the uninstall script removes:**
+
+| Component | Standard | `--purge` |
+|---|---|---|
+| systemd service `vcenteremu` | yes | yes |
+| `/opt/vcenteremu` | yes | yes |
+| `/usr/bin/vcenteremu-ctl`, `vcenteremu-diagnose` | yes | yes |
+| nginx config `/etc/nginx/conf.d/vcenteremu.conf` | yes | yes |
+| firewalld ports 8181/9443 | yes | yes |
+| `/etc/vcenteremu/vcenteremu.env` | no | yes |
+| `/var/lib/vcenteremu/uploads` | no | yes (unless `--keep-data`) |
+| `/var/log/vcenteremu` | no | yes |
+| System user `vcenteremu` | no | yes |
+
+System packages installed during setup (`python3`, `nginx`, `gcc`, …) are **not** removed automatically; uninstall them manually with `dnf remove` if no longer needed.
+
+Alternative wrapper: `sudo bash deploy/uninstall-rhel10.sh`
 
 ### TLS with nginx
 
