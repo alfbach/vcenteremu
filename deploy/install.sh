@@ -16,6 +16,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+INSTALL_REV="$(git -C "${REPO_ROOT}" rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
 APP_DIR="/opt/vcenteremu"
 DATA_DIR="/var/lib/vcenteremu/uploads"
@@ -33,6 +34,10 @@ HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 
 log()  { printf '[vcenteremu] %s\n' "$*"; }
 fail() { printf '[vcenteremu] ERROR: %s\n' "$*" >&2; exit 1; }
+
+if grep -q 'RUN_DIR="/run/vcenteremu"' "${SCRIPT_DIR}/install.sh" 2>/dev/null; then
+  fail "Veraltetes install.sh. Bitte zuerst: git pull && sudo bash deploy/install.sh"
+fi
 
 usage() {
   sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
@@ -53,6 +58,8 @@ done
 if [[ "${EUID}" -ne 0 ]]; then
   fail "Bitte als root ausführen: sudo bash deploy/install.sh"
 fi
+
+log "Install revision: ${INSTALL_REV} (Quelle: ${REPO_ROOT})"
 
 # --- OS check ---
 if [[ -f /etc/redhat-release ]]; then

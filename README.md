@@ -102,9 +102,10 @@ Alternatively, upload and extract a ZIP/tarball of the project.
 
 Run as **root**. The script installs prerequisites, deploys to `/opt/vcenteremu`, and registers a **systemd** service.
 
-**HTTP only (port 8181):**
+**Important:** Run `install.sh` from your **git clone** after `git pull`, not from an outdated `/opt/vcenteremu` copy. The script copies from the clone into `/opt/vcenteremu`.
 
 ```bash
+git pull
 sudo bash deploy/install.sh
 ```
 
