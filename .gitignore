@@ -5,5 +5,5 @@ __pycache__/
 .pytest_cache/
 .env
 /var/
-uploads/
-*.xlsx
+deploy/
+!app/web/static/logo.png

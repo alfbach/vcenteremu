@@ -115,6 +115,10 @@ rsync -a --delete \
   --exclude 'uploads' \
   "${REPO_ROOT}/" "${APP_DIR}/"
 
+if [[ -f "${REPO_ROOT}/logo.png" ]]; then
+  cp "${REPO_ROOT}/logo.png" "${APP_DIR}/app/web/static/logo.png"
+fi
+
 # --- Environment file ---
 if [[ ! -f "${ENV_FILE}" ]]; then
   log "Erstelle ${ENV_FILE} ..."

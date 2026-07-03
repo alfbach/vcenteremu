@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from app import __version__
 from app.api import appliance, cluster, datastore, datacenter, folder, host, network, resource_pool, session, vm
@@ -46,6 +49,10 @@ def create_app() -> FastAPI:
     rest.include_router(folder.router)
     rest.include_router(appliance.router)
     app.mount("/rest", rest)
+
+    static_dir = Path(__file__).resolve().parent / "web" / "static"
+    static_dir.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     app.include_router(web_router)
     app.state.settings = settings

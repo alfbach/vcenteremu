@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="{{ locale }}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>vCenter Emulator</title>
+  <title>{{ t.title }}</title>
   <style>
     :root {
       --bg: #0f1419;
@@ -24,9 +24,57 @@
       min-height: 100vh;
     }
     .wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
-    header { margin-bottom: 2rem; }
-    h1 { margin: 0 0 .35rem; font-size: 1.9rem; }
-    .subtitle { color: var(--muted); }
+    .page-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .header-left {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: .75rem;
+      flex: 1;
+      min-width: 0;
+    }
+    .header-text { flex: 1; min-width: 0; width: 100%; }
+    .header-logo-wrap {
+      flex-shrink: 0;
+      display: flex;
+      align-items: flex-start;
+    }
+    h1 { margin: 0 0 .35rem; font-size: 1.9rem; line-height: 1.2; }
+    .subtitle { color: var(--muted); margin: 0; }
+    .header-logo {
+      max-height: 4.5rem;
+      max-width: 160px;
+      width: auto;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .lang-switch {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: #101722;
+    }
+    .lang-switch a {
+      padding: .35rem .65rem;
+      font-size: .78rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: var(--muted);
+      letter-spacing: .03em;
+    }
+    .lang-switch a:hover { color: var(--text); background: #182232; }
+    .lang-switch a.active {
+      color: #fff;
+      background: var(--accent);
+    }
     .grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
     .card {
       background: rgba(26, 35, 50, 0.92);
@@ -102,115 +150,101 @@
       font-weight: 700;
       font-size: .75rem;
     }
+    @media (max-width: 640px) {
+      .page-header { flex-direction: column; }
+      .header-logo-wrap { align-self: flex-end; }
+      .header-logo { max-height: 3rem; max-width: 120px; }
+    }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <header>
-      <h1>vCenter Emulator</h1>
-      <p class="subtitle">RVtools XLSX hochladen und eine vCenter-kompatible REST-API bereitstellen.</p>
+    <header class="page-header">
+      <div class="header-left">
+        <nav class="lang-switch" aria-label="{{ t.lang_label }}">
+          <a href="/language/en" class="{% if locale == 'en' %}active{% endif %}">EN</a>
+          <a href="/language/de" class="{% if locale == 'de' %}active{% endif %}">DE</a>
+        </nav>
+        <div class="header-text">
+          <h1>{{ t.title }}</h1>
+          <p class="subtitle">{{ t.subtitle }}</p>
+        </div>
+      </div>
+      <div class="header-logo-wrap">
+        <img src="/static/logo.png" alt="{{ t.title }}" class="header-logo">
+      </div>
     </header>
 
     {% if upload_success %}
     <div class="banner">
-      <strong class="ok">Upload erfolgreich:</strong> {{ uploaded_file }} wurde geladen und indexiert.
+      <strong class="ok">{{ t.upload_success }}</strong> {{ uploaded_file }} {{ t.upload_success_detail }}
     </div>
     {% endif %}
 
     <div class="grid">
       <section class="card">
-        <h2>RVtools Export hochladen</h2>
+        <h2>{{ t.upload_heading }}</h2>
         <form action="/upload" method="post" enctype="multipart/form-data">
-          <label for="file">RVtools Export (.xlsx / .xlsm, z. B. ExportAll2xlsx)</label>
+          <label for="file">{{ t.upload_label }}</label>
           <input id="file" name="file" type="file" accept=".xlsx,.xlsm" required>
-          <button type="submit">Inventar laden</button>
+          <button type="submit">{{ t.upload_button }}</button>
         </form>
-        <p class="muted" style="margin-top:1rem;font-size:.9rem;">
-          Mehrere Benutzer können parallel auf dieselbe emulierte vCenter-Instanz zugreifen.
-          Ein neuer Upload ersetzt das aktuelle Inventar für alle Clients.
-        </p>
+        <p class="muted" style="margin-top:1rem;font-size:.9rem;">{{ t.upload_note }}</p>
       </section>
 
       <section class="card">
-        <h2>Inventar-Status</h2>
+        <h2>{{ t.inventory_heading }}</h2>
         {% if inventory.is_loaded %}
-          <p><strong>Quelle:</strong> {{ inventory.source_file }}</p>
-          <p><strong>vCenter:</strong> {{ inventory.vcenter_server or settings.vcenter_name }}</p>
-          <p><strong>Geladen:</strong> {{ inventory.loaded_at }}</p>
+          <p><strong>{{ t.source }}:</strong> {{ inventory.source_file }}</p>
+          <p><strong>{{ t.vcenter }}:</strong> {{ inventory.vcenter_server or settings.vcenter_name }}</p>
+          <p><strong>{{ t.loaded }}:</strong> {{ inventory.loaded_at }}</p>
           <div class="stats">
             <div class="stat"><strong>{{ inventory.stats.vms }}</strong><span>VMs</span></div>
             <div class="stat"><strong>{{ inventory.stats.hosts }}</strong><span>Hosts</span></div>
             <div class="stat"><strong>{{ inventory.stats.clusters }}</strong><span>Cluster</span></div>
             <div class="stat"><strong>{{ inventory.stats.datastores }}</strong><span>Datastores</span></div>
-            <div class="stat"><strong>{{ inventory.stats.networks }}</strong><span>Netzwerke</span></div>
+            <div class="stat"><strong>{{ inventory.stats.networks }}</strong><span>{{ t.stat_networks }}</span></div>
           </div>
         {% else %}
-          <p class="muted">Noch kein Inventar geladen. Bitte eine RVtools-Datei hochladen.</p>
+          <p class="muted">{{ t.no_inventory }}</p>
         {% endif %}
       </section>
     </div>
 
     <section class="card" style="margin-top:1rem;">
-      <h2>API-Zugang</h2>
+      <h2>{{ t.api_heading }}</h2>
       <table>
-        <tr><th>Basis-URL</th><td><code>{{ api_base }}</code></td></tr>
-        <tr><th>Benutzer</th><td><code>{{ settings.api_username }}</code></td></tr>
-        <tr><th>Passwort</th><td><code>{{ settings.api_password }}</code></td></tr>
-        <tr><th>Session-Header</th><td><code>vmware-api-session-id: &lt;token&gt;</code></td></tr>
-        <tr><th>Health</th><td><code>{{ base_url }}/health</code></td></tr>
+        <tr><th>{{ t.api_base_url }}</th><td><code>{{ api_base }}</code></td></tr>
+        <tr><th>{{ t.api_user }}</th><td><code>{{ settings.api_username }}</code></td></tr>
+        <tr><th>{{ t.api_password }}</th><td><code>{{ settings.api_password }}</code></td></tr>
+        <tr><th>{{ t.api_session_header }}</th><td><code>vmware-api-session-id: &lt;token&gt;</code></td></tr>
+        <tr><th>{{ t.api_health }}</th><td><code>{{ base_url }}/health</code></td></tr>
       </table>
     </section>
 
     <section class="card" style="margin-top:1rem;">
-      <h2>TLS / Produktion</h2>
-      <p class="muted" style="font-size:.9rem;">
-        Für HTTPS auf RHEL 10: <code>sudo bash deploy/install-nginx-tls.sh vcenteremu.local</code>
-        — nginx auf Port 443, Backend intern auf 127.0.0.1:8080, selbstsigniertes Zertifikat.
-      </p>
+      <h2>{{ t.tls_heading }}</h2>
+      <p class="muted" style="font-size:.9rem;">{{ t.tls_note | safe }}</p>
     </section>
 
     <section class="card" style="margin-top:1rem;">
-      <h2>Beispiel: Session, VM-Liste und Power On</h2>
-      <pre># 1) Session anlegen (Basic Auth)
+      <h2>{{ t.example_heading }}</h2>
+      <pre># 1) Session
 curl -sk -u "{{ settings.api_username }}:{{ settings.api_password }}" \
   -X POST "{{ api_base }}/com/vmware/cis/session"
 
-# 2) VMs abfragen
+# 2) List VMs
 curl -sk -H "vmware-api-session-id: &lt;token&gt;" \
   "{{ api_base }}/vcenter/vm"
 
-# 3) VM einschalten (simuliert)
+# 3) Power on (simulated)
 curl -sk -H "vmware-api-session-id: &lt;token&gt;" \
   -X POST "{{ api_base }}/vcenter/vm/vm-web-01/power/start"</pre>
     </section>
 
     <section class="card" style="margin-top:1rem;">
-      <h2>Verfügbare Endpunkte</h2>
-      {% set endpoints = [
-        ("POST", "/rest/com/vmware/cis/session", "Session erstellen (Basic Auth)"),
-        ("DELETE", "/rest/com/vmware/cis/session", "Session beenden"),
-        ("GET", "/rest/vcenter/vm", "Alle VMs"),
-        ("GET", "/rest/vcenter/vm/{vm}", "VM-Details"),
-        ("PATCH", "/rest/vcenter/vm/{vm}", "Annotation ändern (simuliert)"),
-        ("GET", "/rest/vcenter/vm/{vm}/guest/identity", "Guest-Identität"),
-        ("GET", "/rest/vcenter/vm/{vm}/guest/networking", "Guest-Netzwerk"),
-        ("POST", "/rest/vcenter/vm/{vm}/power/start", "Power On (simuliert)"),
-        ("POST", "/rest/vcenter/vm/{vm}/power/stop", "Power Off (simuliert)"),
-        ("POST", "/rest/vcenter/vm/{vm}/power/suspend", "Suspend (simuliert)"),
-        ("POST", "/rest/vcenter/vm/{vm}/power/reset", "Reset (simuliert)"),
-        ("GET", "/rest/vcenter/host", "Alle ESXi-Hosts"),
-        ("GET", "/rest/vcenter/host/{host}", "Host-Details"),
-        ("POST", "/rest/vcenter/host/{host}/maintenance/enter", "Wartungsmodus (simuliert)"),
-        ("POST", "/rest/vcenter/host/{host}/maintenance/exit", "Wartungsmodus beenden"),
-        ("GET", "/rest/vcenter/cluster", "Alle Cluster"),
-        ("GET", "/rest/vcenter/datastore", "Alle Datastores"),
-        ("GET", "/rest/vcenter/datacenter", "Alle Datacenter"),
-        ("GET", "/rest/vcenter/network", "Alle Netzwerke"),
-        ("GET", "/rest/vcenter/resource-pool", "Resource Pools"),
-        ("GET", "/rest/vcenter/folder", "Ordner"),
-        ("GET", "/rest/appliance/system/version", "vCenter-Version"),
-      ] %}
-      {% for method, path, desc in endpoints %}
+      <h2>{{ t.endpoints_heading }}</h2>
+      {% for method, path, desc in t.endpoints %}
       <div class="endpoint">
         <span class="method">{{ method }}</span>
         <code>{{ path }}</code>
