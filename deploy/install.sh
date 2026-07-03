@@ -35,7 +35,7 @@ HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
 log()  { printf '[vcenteremu] %s\n' "$*"; }
 fail() { printf '[vcenteremu] ERROR: %s\n' "$*" >&2; exit 1; }
 
-if grep -q 'RUN_DIR="/run/vcenteremu"' "${SCRIPT_DIR}/install.sh" 2>/dev/null; then
+if ! grep -q 'STATE_DIR="/var/lib/vcenteremu/run"' "${SCRIPT_DIR}/install.sh" 2>/dev/null; then
   fail "Veraltetes install.sh. Bitte zuerst: git pull && sudo bash deploy/install.sh"
 fi
 
