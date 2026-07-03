@@ -1,3 +1,5 @@
+<img align="right" src="logo.png" alt="vCenter Emulator Logo" height="100" />
+
 # vCenter Emulator
 
 Emulates a **VMware vCenter REST API** based on an **RVtools XLSX export**. The application runs on **RHEL 10**, provides a web interface for uploads, and serves multiple concurrent API clients.
