@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vcenteremu
+  labels:
+    app.kubernetes.io/name: vcenteremu
+    app.kubernetes.io/part-of: vcenteremu

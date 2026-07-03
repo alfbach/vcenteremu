@@ -14,6 +14,7 @@ Emulates a **VMware vCenter REST API** based on an **RVtools XLSX export**. The 
 - **Additional endpoints**: resource pools, folders, guest identity/networking
 - Concurrent access via async FastAPI + optional multiple Uvicorn workers
 - **TLS via nginx** (self-signed or custom certificate)
+- **OpenShift 4** deployment with Route, PVC, and UBI-based container image
 
 ## Quick Start (Development)
 
@@ -195,6 +196,173 @@ sudo bash deploy/install-nginx-tls.sh vcenteremu.example.com
 - Backend runs internally on **127.0.0.1:8080**
 - Self-signed certificate: `/etc/vcenteremu/tls/`
 - Replace with your own CA: place `cert.pem` and `key.pem` in that directory and run `sudo systemctl restart nginx`
+
+## Install on OpenShift 4
+
+Deploy the emulator as a containerized application on **Red Hat OpenShift Container Platform 4** with HTTPS via an OpenShift **Route**, persistent upload storage, and a **UBI 9**-based image.
+
+![vCenter Emulator Web UI](screen1.png)
+
+### Requirements
+
+- OpenShift 4.x cluster with cluster-admin or project-admin access
+- OpenShift CLI (`oc`) installed and logged in: `oc login`
+- A dynamic storage provisioner (for the upload PVC)
+- Permission to create Builds and Routes in the target project
+- An RVtools XLSX export for upload via the web UI
+
+### Architecture on OpenShift
+
+| Component | Description |
+|---|---|
+| `Dockerfile` | UBI 9 Python 3.11 image, non-root (UID 1001), port **8080** |
+| `Deployment` | Single replica (in-memory inventory); `Recreate` strategy |
+| `PVC` | 5 GiB volume for uploaded XLSX files |
+| `Route` | HTTPS edge termination (redirects HTTP → HTTPS) |
+| `ConfigMap` / `Secret` | Application settings and API password |
+| `BuildConfig` | Optional image build from Git or local source |
+
+Manifests are located in `deploy/openshift/`.
+
+### Option A — Automated install (recommended)
+
+From the project root, on a workstation with `oc` access:
+
+```bash
+chmod +x deploy/openshift/install-openshift.sh
+./deploy/openshift/install-openshift.sh \
+  --namespace vcenteremu \
+  --hostname vcenteremu.apps.cluster.example.com
+```
+
+The script will:
+
+1. Create the namespace `vcenteremu`
+2. Create a Secret with your API password (interactive prompt)
+3. Apply ConfigMap, PVC, Service, and Route
+4. Build the container image via OpenShift BuildConfig
+5. Deploy the application and wait for rollout
+
+After completion, open the Route URL shown in the output, e.g. `https://vcenteremu.apps.cluster.example.com/`.
+
+Build from a pre-pushed image instead:
+
+```bash
+./deploy/openshift/install-openshift.sh \
+  --namespace vcenteremu \
+  --from-image quay.io/your-org/vcenteremu:latest \
+  --password 'YourSecurePassword'
+```
+
+### Option B — Manual install
+
+**1. Log in and create project**
+
+```bash
+oc login --token=<token> --server=https://api.cluster.example.com:6443
+oc new-project vcenteremu
+```
+
+**2. Create secret and configuration**
+
+```bash
+oc create secret generic vcenteremu-secret \
+  --from-literal=VCENTEREMU_API_PASSWORD='YourSecurePassword'
+
+oc apply -f deploy/openshift/configmap.yaml
+oc patch configmap vcenteremu-config \
+  --type merge -p '{"data":{"VCENTEREMU_VCENTER_NAME":"vcenteremu.apps.cluster.example.com"}}'
+```
+
+**3. Build the image**
+
+From Git (cluster must reach GitHub):
+
+```bash
+oc apply -f deploy/openshift/buildconfig.yaml
+oc start-build vcenteremu --wait
+```
+
+Or build locally and push to your registry:
+
+```bash
+podman build -t quay.io/your-org/vcenteremu:latest .
+podman push quay.io/your-org/vcenteremu:latest
+```
+
+**4. Deploy workload**
+
+```bash
+oc apply -f deploy/openshift/pvc.yaml
+oc apply -f deploy/openshift/deployment.yaml
+oc apply -f deploy/openshift/service.yaml
+oc apply -f deploy/openshift/route.yaml
+
+# if using an external image:
+oc set image deployment/vcenteremu vcenteremu=quay.io/your-org/vcenteremu:latest
+```
+
+**5. Verify**
+
+```bash
+oc get pods,route -n vcenteremu
+oc logs -f deployment/vcenteremu
+
+ROUTE=$(oc get route vcenteremu -o jsonpath='{.spec.host}')
+curl -sk "https://${ROUTE}/health"
+```
+
+### Option C — Kustomize
+
+```bash
+oc apply -k deploy/openshift/
+oc create secret generic vcenteremu-secret \
+  --from-literal=VCENTEREMU_API_PASSWORD='YourSecurePassword' \
+  -n vcenteremu
+oc set image deployment/vcenteremu \
+  vcenteremu=image-registry.openshift-image-registry.svc:5000/vcenteremu/vcenteremu:latest \
+  -n vcenteremu
+```
+
+### Using the application on OpenShift
+
+1. Open the Route URL in your browser.
+2. Select **EN** or **DE** for the UI language.
+3. Upload your RVtools `.xlsx` file (stored on the PVC).
+4. Use the displayed API credentials and `/rest/` endpoints.
+
+Example API call via Route:
+
+```bash
+ROUTE=$(oc get route vcenteremu -o jsonpath='{.spec.host}')
+TOKEN=$(curl -sk -u 'administrator@vsphere.local:YourSecurePassword' \
+  -X POST "https://${ROUTE}/rest/com/vmware/cis/session")
+curl -sk -H "vmware-api-session-id: ${TOKEN}" \
+  "https://${ROUTE}/rest/vcenter/vm" | head
+```
+
+### Operations
+
+```bash
+# Scale (keep at 1 replica — inventory is in-memory per pod)
+oc scale deployment/vcenteremu --replicas=1
+
+# Restart after ConfigMap change
+oc rollout restart deployment/vcenteremu
+
+# View logs
+oc logs -f deployment/vcenteremu
+
+# Delete everything
+oc delete project vcenteremu
+```
+
+### OpenShift notes
+
+- **Single replica recommended** — each pod holds its own in-memory inventory; use one replica or accept inconsistent state across pods.
+- **Upload limit** — default 512 MiB (`VCENTEREMU_MAX_UPLOAD_MB` in ConfigMap).
+- **TLS** — handled by the OpenShift Route (edge termination); no nginx required inside the cluster.
+- **Restricted SCC** — the image runs as non-root UID 1001 and is compatible with the default restricted Security Context Constraint.
 
 ## API Usage
 

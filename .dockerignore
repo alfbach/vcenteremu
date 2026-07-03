@@ -3,8 +3,11 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.git/
 .env
-/var/
 uploads/
+customer.xlsx
 *.xlsx
-deploy/openshift/secret.yaml
+screen1.png
+.vscode/
+terminals/

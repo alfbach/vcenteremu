@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: vcenteremu
+  labels:
+    app.kubernetes.io/name: vcenteremu
+spec:
+  to:
+    kind: Service
+    name: vcenteremu
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
