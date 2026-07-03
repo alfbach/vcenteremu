@@ -27,6 +27,19 @@ ENV_FILE="${ENV_DIR}/vcenteremu.env"
 SERVICE_USER="vcenteremu"
 SERVICE_NAME="vcenteremu"
 CTL_BIN="/usr/local/bin/vcenteremu-ctl"
+NGINX_CONF="/etc/nginx/conf.d/vcenteremu.conf"
+
+set_env() {
+  local key="$1"
+  local value="$2"
+  mkdir -p "${ENV_DIR}"
+  touch "${ENV_FILE}"
+  if grep -q "^${key}=" "${ENV_FILE}"; then
+    sed -i "s|^${key}=.*|${key}=${value}|" "${ENV_FILE}"
+  else
+    echo "${key}=${value}" >> "${ENV_FILE}"
+  fi
+}
 
 WITH_TLS=false
 WITH_FIREWALL=false
@@ -132,7 +145,7 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   cat > "${ENV_FILE}" <<EOF
 VCENTEREMU_HOST=0.0.0.0
 VCENTEREMU_PORT=8181
-VCENTEREMU_WORKERS=4
+VCENTEREMU_WORKERS=1
 VCENTEREMU_UPLOAD_DIR=${DATA_DIR}
 VCENTEREMU_API_USERNAME=administrator@vsphere.local
 VCENTEREMU_API_PASSWORD=Emulator123!
@@ -191,6 +204,18 @@ fi
 if [[ "${WITH_TLS}" == true ]]; then
   log "Konfiguriere TLS/nginx ..."
   bash "${APP_DIR}/deploy/install-nginx-tls.sh" "${HOSTNAME}"
+else
+  log "HTTP-Modus: App lauscht auf 0.0.0.0:8181 ..."
+  set_env "VCENTEREMU_HOST" "0.0.0.0"
+  set_env "VCENTEREMU_PORT" "8181"
+  set_env "VCENTEREMU_WORKERS" "1"
+  if [[ -f "${NGINX_CONF}" ]]; then
+    log "Entferne nginx vcenteremu-Config (belegt sonst Port 8181) ..."
+    rm -f "${NGINX_CONF}"
+    if systemctl is-active --quiet nginx 2>/dev/null; then
+      systemctl reload nginx || systemctl restart nginx
+    fi
+  fi
 fi
 
 # --- Firewall (optional) ---
@@ -229,7 +254,12 @@ fi
 if curl -sk --max-time 5 "${HEALTH_URL}" >/dev/null 2>&1; then
   log "Health-Check OK: ${HEALTH_URL}"
 else
-  log "Health-Check fehlgeschlagen (Service evtl. noch am Starten): ${HEALTH_URL}"
+  log "Health-Check fehlgeschlagen — Diagnose: vcenteremu-ctl diagnose"
+fi
+
+if command -v ss >/dev/null 2>&1; then
+  log "Lauschende Ports (8181/8182/9443):"
+  ss -tlnp 2>/dev/null | grep -E ':8181|:8182|:9443' || log "  (keiner — Service prüfen: journalctl -u ${SERVICE_NAME} -n 30)"
 fi
 
 echo ""
@@ -239,10 +269,14 @@ echo "============================================"
 if [[ "${WITH_TLS}" == true ]]; then
   echo " Web-UI:  https://${HOSTNAME}:9443/"
   echo " API:     https://${HOSTNAME}:9443/rest/"
+  echo " Hinweis: Port 8181 leitet nur auf HTTPS (9443) um."
 else
   echo " Web-UI:  http://${HOSTNAME}:8181/"
   echo " API:     http://${HOSTNAME}:8181/rest/"
 fi
+echo ""
+echo " Diagnose bei Problemen:"
+echo "   vcenteremu-ctl diagnose"
 echo ""
 echo " Steuerung:"
 echo "   systemctl status ${SERVICE_NAME}"

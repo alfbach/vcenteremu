@@ -130,12 +130,73 @@ stop_daemon() {
 
 status_daemon() {
   load_env
-  if is_running; then
-    log "Läuft (PID $(cat "${PID_FILE}")) — http://${VCENTEREMU_HOST}:${VCENTEREMU_PORT}/"
+  if systemctl is-active --quiet vcenteremu 2>/dev/null; then
+    log "systemd: vcenteremu.service läuft"
+  elif is_running; then
+    log "Manueller Prozess (PID $(cat "${PID_FILE}"))"
+  else
+    log "Gestoppt (weder systemd noch manueller Prozess)."
+  fi
+  log "Konfiguration: ${VCENTEREMU_HOST}:${VCENTEREMU_PORT} (env: ${ENV_FILE})"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnp 2>/dev/null | grep -E ':8181|:8182|:9443' || log "Kein Listener auf 8181/8182/9443"
+  fi
+  if [[ "${VCENTEREMU_PORT}" == "8182" ]] && [[ "${VCENTEREMU_HOST}" != "0.0.0.0" ]]; then
+    log "TLS-Backend-Modus: Web-UI über https://<host>:9443/ (nicht direkt :8181)"
+  fi
+  if is_running || systemctl is-active --quiet vcenteremu 2>/dev/null; then
+    log "URL: http://${VCENTEREMU_HOST}:${VCENTEREMU_PORT}/"
     return 0
   fi
-  log "Gestoppt."
   return 1
+}
+
+diagnose() {
+  load_env
+  log "=== vcenteremu Diagnose ==="
+  log "Env-Datei: ${ENV_FILE}"
+  log "Bind: ${VCENTEREMU_HOST}:${VCENTEREMU_PORT}  Workers: ${VCENTEREMU_WORKERS}"
+  log "App: ${VCENTEREMU_BIN} ($([[ -x "${VCENTEREMU_BIN}" ]] && echo OK || echo FEHLT))"
+
+  if systemctl is-active --quiet vcenteremu 2>/dev/null; then
+    log "systemd: active"
+  else
+    log "systemd: $(systemctl is-active vcenteremu 2>/dev/null || echo nicht verfügbar)"
+    log "Letzte Logs:"
+    journalctl -u vcenteremu -n 15 --no-pager 2>/dev/null || true
+  fi
+
+  if [[ -f /etc/nginx/conf.d/vcenteremu.conf ]]; then
+    log "nginx vcenteremu.conf: vorhanden (8181/9443 → Backend 8182)"
+    systemctl is-active nginx 2>/dev/null && log "nginx: active" || log "nginx: inactive — Port 8181 antwortet nicht im TLS-Modus!"
+  else
+    log "nginx vcenteremu.conf: nicht vorhanden (direkter HTTP auf App-Port)"
+  fi
+
+  if command -v ss >/dev/null 2>&1; then
+    log "Listener:"
+    ss -tlnp 2>/dev/null | grep -E ':8181|:8182|:9443' || log "  keine auf 8181/8182/9443"
+  fi
+
+  local health_host="127.0.0.1"
+  local health_port="${VCENTEREMU_PORT}"
+  if [[ -f /etc/nginx/conf.d/vcenteremu.conf ]] && systemctl is-active --quiet nginx 2>/dev/null; then
+    health_port="9443"
+    log "Health (HTTPS): curl -sk https://127.0.0.1:9443/health"
+    curl -sk --max-time 3 "https://127.0.0.1:9443/health" 2>/dev/null && log "  → OK" || log "  → FEHLER"
+  fi
+  log "Health (App): curl -s http://${health_host}:${health_port}/health"
+  curl -s --max-time 3 "http://${health_host}:${health_port}/health" 2>/dev/null && log "  → OK" || log "  → FEHLER"
+
+  if systemctl is-active --quiet firewalld 2>/dev/null; then
+    log "firewalld aktiv — Ports:"
+    firewall-cmd --list-ports 2>/dev/null || true
+  fi
+
+  if [[ "${VCENTEREMU_HOST}" == "127.0.0.1" ]] && [[ ! -f /etc/nginx/conf.d/vcenteremu.conf ]]; then
+    log "HINWEIS: App bindet nur localhost — von außen nicht erreichbar."
+    log "Fix: VCENTEREMU_HOST=0.0.0.0 und VCENTEREMU_PORT=8181 in ${ENV_FILE}, dann systemctl restart vcenteremu"
+  fi
 }
 
 usage() {
@@ -147,6 +208,7 @@ Commands:
   stop        Stoppt den manuell gestarteten Emulator
   restart     Neustart (manuell)
   status      Zeigt den Prozessstatus
+  diagnose    Port-, Config- und Health-Check (Fehlersuche)
   foreground  Startet im Vordergrund (für systemd / Debugging)
 
 Empfohlen für Produktion: systemctl start vcenteremu
@@ -160,6 +222,7 @@ case "${CMD}" in
   stop)       stop_daemon ;;
   restart)    stop_daemon; start_daemon ;;
   status)     status_daemon ;;
+  diagnose)   diagnose ;;
   foreground) start_foreground ;;
   *)          usage ;;
 esac
