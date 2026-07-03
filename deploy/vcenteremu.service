@@ -1,0 +1,24 @@
+[Unit]
+Description=vCenter Emulator (RVtools-based)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=vcenteremu
+Group=vcenteremu
+WorkingDirectory=/opt/vcenteremu
+RuntimeDirectory=vcenteremu
+Environment=VCENTEREMU_HOST=0.0.0.0
+Environment=VCENTEREMU_PORT=8443
+Environment=VCENTEREMU_UPLOAD_DIR=/var/lib/vcenteremu/uploads
+EnvironmentFile=-/etc/vcenteremu/vcenteremu.env
+ExecStart=/opt/vcenteremu/deploy/vcenteremu-start.sh foreground
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+StandardOutput=append:/var/log/vcenteremu/vcenteremu.log
+StandardError=append:/var/log/vcenteremu/vcenteremu.log
+
+[Install]
+WantedBy=multi-user.target
