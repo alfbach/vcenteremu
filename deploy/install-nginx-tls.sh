@@ -36,6 +36,8 @@ set_env() {
 set_env "VCENTEREMU_HOST" "127.0.0.1"
 set_env "VCENTEREMU_PORT" "8182"
 set_env "VCENTEREMU_VCENTER_NAME" "${SERVER_NAME}"
+chown root:vcenteremu "${ENV_DIR}" "${ENV_FILE}" 2>/dev/null || true
+chmod 750 "${ENV_DIR}"
 chmod 640 "${ENV_FILE}"
 
 systemctl enable nginx

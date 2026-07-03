@@ -41,6 +41,16 @@ set_env() {
   fi
 }
 
+secure_env_permissions() {
+  mkdir -p "${ENV_DIR}"
+  chown root:"${SERVICE_USER}" "${ENV_DIR}"
+  chmod 750 "${ENV_DIR}"
+  if [[ -f "${ENV_FILE}" ]]; then
+    chown root:"${SERVICE_USER}" "${ENV_FILE}"
+    chmod 640 "${ENV_FILE}"
+  fi
+}
+
 WITH_TLS=false
 WITH_FIREWALL=false
 HOSTNAME="$(hostname -f 2>/dev/null || hostname)"
@@ -152,10 +162,10 @@ VCENTEREMU_API_PASSWORD=Emulator123!
 VCENTEREMU_VCENTER_NAME=${HOSTNAME}
 VCENTEREMU_MAX_UPLOAD_MB=256
 EOF
-  chmod 640 "${ENV_FILE}"
 else
   log "Behalte vorhandene Konfiguration: ${ENV_FILE}"
 fi
+secure_env_permissions
 
 # --- Python virtualenv ---
 log "Erstelle Python venv und installiere Abhängigkeiten ..."
@@ -219,6 +229,7 @@ else
     fi
   fi
 fi
+secure_env_permissions
 
 # --- Firewall ---
 if systemctl is-active --quiet firewalld 2>/dev/null; then
@@ -236,6 +247,17 @@ fi
 
 # --- Start service ---
 log "Starte ${SERVICE_NAME} ..."
+systemctl stop "${SERVICE_NAME}.service" 2>/dev/null || true
+if [[ "${WITH_TLS}" != true ]] && ss -tlnp 2>/dev/null | grep -q ':8181'; then
+  log "Port 8181 noch belegt — Details:"
+  ss -tlnp 2>/dev/null | grep ':8181' || true
+  if [[ -f "${NGINX_CONF}" ]]; then
+    log "Entferne nginx vcenteremu-Config und lade nginx neu ..."
+    rm -f "${NGINX_CONF}"
+    systemctl reload nginx 2>/dev/null || systemctl restart nginx 2>/dev/null || true
+  fi
+  sleep 1
+fi
 systemctl restart "${SERVICE_NAME}.service"
 
 sleep 1

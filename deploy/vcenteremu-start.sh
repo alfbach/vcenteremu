@@ -22,11 +22,13 @@ log()  { printf '[vcenteremu-ctl] %s\n' "$*"; }
 fail() { printf '[vcenteremu-ctl] ERROR: %s\n' "$*" >&2; exit 1; }
 
 load_env() {
-  if [[ -f "${ENV_FILE}" ]]; then
+  if [[ -f "${ENV_FILE}" ]] && [[ -r "${ENV_FILE}" ]]; then
     set -a
     # shellcheck disable=SC1090
     source "${ENV_FILE}"
     set +a
+  elif [[ -f "${ENV_FILE}" ]]; then
+    log "Warnung: ${ENV_FILE} nicht lesbar — chown root:vcenteremu ${ENV_FILE}"
   fi
 
   export VCENTEREMU_HOST="${VCENTEREMU_HOST:-0.0.0.0}"
@@ -196,6 +198,17 @@ diagnose() {
   if [[ "${VCENTEREMU_HOST}" == "127.0.0.1" ]] && [[ ! -f /etc/nginx/conf.d/vcenteremu.conf ]]; then
     log "HINWEIS: App bindet nur localhost — von außen nicht erreichbar."
     log "Fix: VCENTEREMU_HOST=0.0.0.0 und VCENTEREMU_PORT=8181 in ${ENV_FILE}, dann systemctl restart vcenteremu"
+  fi
+
+  if ss -tlnp 2>/dev/null | grep -q ':8181'; then
+    log "Port 8181 belegt von:"
+    ss -tlnp 2>/dev/null | grep ':8181' || true
+    log "Fix: systemctl stop vcenteremu; sudo fuser -k 8181/tcp; systemctl start vcenteremu"
+  fi
+
+  if [[ -f "${ENV_FILE}" ]] && ! sudo -u "${SERVICE_USER}" test -r "${ENV_FILE}" 2>/dev/null; then
+    log "HINWEIS: ${ENV_FILE} für User ${SERVICE_USER} nicht lesbar"
+    log "Fix: chown root:${SERVICE_USER} ${ENV_FILE} && chmod 640 ${ENV_FILE} && chmod 750 ${ENV_DIR:-/etc/vcenteremu}"
   fi
 }
 
