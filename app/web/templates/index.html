@@ -23,28 +23,24 @@
       color: var(--text);
       min-height: 100vh;
     }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 2rem 1.25rem 3rem; position: relative; }
     .page-header {
       display: flex;
-      justify-content: space-between;
       align-items: flex-start;
       gap: 1.25rem;
       margin-bottom: 2rem;
+      padding-right: 4.5rem;
     }
-    .header-left {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: .75rem;
-      flex: 1;
-      min-width: 0;
-    }
-    .header-text { flex: 1; min-width: 0; width: 100%; }
     .header-logo-wrap {
       flex-shrink: 0;
       display: flex;
       align-items: flex-start;
     }
+    .header-main {
+      flex: 1;
+      min-width: 0;
+    }
+    .header-text { min-width: 0; }
     h1 { margin: 0 0 .35rem; font-size: 1.9rem; line-height: 1.2; }
     .subtitle { color: var(--muted); margin: 0; }
     .header-logo {
@@ -56,11 +52,15 @@
       display: block;
     }
     .lang-switch {
+      position: absolute;
+      top: 2rem;
+      right: 1.25rem;
       display: inline-flex;
       border: 1px solid var(--border);
       border-radius: 8px;
       overflow: hidden;
       background: #101722;
+      z-index: 1;
     }
     .lang-switch a {
       padding: .35rem .65rem;
@@ -151,27 +151,28 @@
       font-size: .75rem;
     }
     @media (max-width: 640px) {
-      .page-header { flex-direction: column; }
-      .header-logo-wrap { align-self: flex-end; }
+      .page-header { flex-wrap: wrap; padding-right: 0; padding-top: 2.5rem; }
+      .header-main { width: 100%; }
+      .lang-switch { top: 2rem; right: 1.25rem; }
       .header-logo { max-height: 3rem; max-width: 120px; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
+    <nav class="lang-switch" aria-label="{{ t.lang_label }}">
+      <a href="/language/en" class="{% if locale == 'en' %}active{% endif %}">EN</a>
+      <a href="/language/de" class="{% if locale == 'de' %}active{% endif %}">DE</a>
+    </nav>
     <header class="page-header">
-      <div class="header-left">
-        <nav class="lang-switch" aria-label="{{ t.lang_label }}">
-          <a href="/language/en" class="{% if locale == 'en' %}active{% endif %}">EN</a>
-          <a href="/language/de" class="{% if locale == 'de' %}active{% endif %}">DE</a>
-        </nav>
+      <div class="header-logo-wrap">
+        <img src="/static/logo.png" alt="{{ t.title }}" class="header-logo">
+      </div>
+      <div class="header-main">
         <div class="header-text">
           <h1>{{ t.title }}</h1>
           <p class="subtitle">{{ t.subtitle }}</p>
         </div>
-      </div>
-      <div class="header-logo-wrap">
-        <img src="/static/logo.png" alt="{{ t.title }}" class="header-logo">
       </div>
     </header>
 
